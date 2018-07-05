@@ -14,19 +14,49 @@ namespace Hackathon.MightyDucks.Gamify
     public static class PointsRecorder
     {
         private const string TableName = "PointsRecorder";
-        private const string Route = "points/send/{id?}/{points?}";
+        private const string RoutePoints = "points/send/{id?}/{points?}";
+        private const string RouteReset = "reset";
+        private const string PartitionKey = "MightyDucks";
 
         [FunctionName("PointsRecorder")]
         [return: Table(TableName)]
         public static async Task<PointsReceived> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = Route)]HttpRequestMessage req, 
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = RoutePoints)]HttpRequestMessage req, 
             [Table(TableName)]CloudTable table,
             TraceWriter log)
         {
             List<KeyValuePair<string, string>> values = req.GetQueryNameValuePairs().ToList();
+            var id = values.ElementAt(0).Value;
+            var points = Int16.Parse(values.ElementAt(1).Value);
 
-            return new PointsReceived { PartitionKey = "MightyDucks", RowKey = values.ElementAt(0).Value, Points = values.ElementAt(1).Value};
+            var operation = TableOperation.Retrieve<PointsReceived>(PartitionKey, id);
+            var result = await table.ExecuteAsync(operation);
+
+            if (result.Result != null)
+            {
+                var pointsReceiver = (PointsReceived) result.Result;
+                pointsReceiver.Points += points;
+                return pointsReceiver;
+            }
+
+            return new PointsReceived
+            {
+                PartitionKey = PartitionKey,
+                Id = id,
+                Points = points
+            };
         }
+
+        [FunctionName("ResetTable")]
+        public static async Task<HttpResponseMessage> ResetTable(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = RouteReset)]HttpRequestMessage req,
+            [Table(TableName)]CloudTable table,
+            TraceWriter log
+        )
+        {
+            await table.DeleteAsync();
+            return new HttpResponseMessage(HttpStatusCode.Accepted);
+        } 
 
         public class PointsReceived : TableEntity
         {
@@ -36,7 +66,7 @@ namespace Hackathon.MightyDucks.Gamify
                 set => RowKey = value;
             }
 
-            public string Points { get; set; }
+            public int Points { get; set; }
         }
     }
 }
