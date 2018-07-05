@@ -27,7 +27,7 @@ namespace Hackathon.MightyDucks.Gamify
         {
             List<KeyValuePair<string, string>> values = req.GetQueryNameValuePairs().ToList();
             var id = values.ElementAt(0).Value;
-            var points = Int16.Parse(values.ElementAt(1).Value);
+            var points = long.Parse(values.ElementAt(1).Value);
 
             var operation = TableOperation.Retrieve<PointsReceived>(PartitionKey, id);
             var result = await table.ExecuteAsync(operation);
@@ -66,7 +66,7 @@ namespace Hackathon.MightyDucks.Gamify
                 set => RowKey = value;
             }
 
-            public int Points { get; set; }
+            public long Points { get; set; }
         }
     }
 }
